@@ -9,8 +9,7 @@
 
 #include <SPI.h>
 
-#define SPI1_NSS_PIN PA4    //SPI_1 Chip Select pin is PA4. You can change it to the STM32 pin you want.
-
+#define DDS_CS PA4    //SPI_1 Chip Select pin is PA4
 #define DDS_P0  PB12
 #define DDS_SD1 PA0
 #define DDS_SD3 PA1
@@ -50,8 +49,8 @@ void setup() {
   pinMode(DDS_PDC, OUTPUT);
   digitalWrite(DDS_PDC, LOW); // Power-Down Control
 
-  pinMode(SPI1_NSS_PIN, OUTPUT);
-  digitalWrite(SPI1_NSS_PIN, HIGH); // CHIP_SELECT
+  pinMode(DDS_CS, OUTPUT);
+  digitalWrite(DDS_CS, HIGH); // CHIP_SELECT
 
   // Setup SPI communication
   SPI.begin(); //Initialize the SPI_1 port.
@@ -78,26 +77,26 @@ void setup() {
   /* MODIFY CHANNEL 2 SIGNAL */
   channelSel(2);             //select a channel (0,1,2,3) to write to.  4 selects all channels
   
-  freq = 1e6; // 10MHz
+  freq = 150e6; // 10MHz
   writeFreq(freq);       //write a new frequency to the selected channel
 
 //  phase = 120.0;
 //  writePhase(phase);
 
-//  amplitude = 0.5;
-//  writeAmplitude(amplitude);
+  amplitude = 1.0;
+  writeAmplitude(amplitude);
 
   /* MODIFY CHANNEL 3 SIGNAL */
   channelSel(3);             //select a channel (0,1,2,3) to write to.  4 selects all channels
   
-  freq = 100e3; // 10MHz
+  freq = 10e6; // 10MHz
   writeFreq(freq);       //write a new frequency to the selected channel
 
 //  phase = 240.0;
 //  writePhase(phase);
 
-//  amplitude = 0.10;
-//  writeAmplitude(amplitude);
+  amplitude = 1.0;
+  writeAmplitude(amplitude);
 
   /* UPDATE CHANGES */
   pulseUpdate();        //update output to the new frequency
@@ -110,12 +109,12 @@ void loop()
 
 void sendSPI()
 {
-  digitalWrite(SPI1_NSS_PIN, LOW); // manually take CSN low for SPI_1 transmission
+  digitalWrite(DDS_CS, LOW); // manually take CSN low for SPI_1 transmission
 
   SPI.transfer(READ_DDS | 0x00);
   data = SPI.transfer(0x00);
 
-  digitalWrite(SPI1_NSS_PIN, HIGH); // manually take CSN high between spi transmissions
+  digitalWrite(DDS_CS, HIGH); // manually take CSN high between spi transmissions
 
   Serial.print(data);
   Serial.print("\r");
@@ -129,10 +128,10 @@ void resetDDS() //master resets the DDS
 
 void resetCommunication() //resets DDS internal communication (using before new command adds protection against previous bad writes)
 {
-  digitalWrite(SPI1_NSS_PIN, HIGH);
+  digitalWrite(DDS_CS, HIGH);
   digitalWrite(DDS_SD3, HIGH);
   digitalWrite(DDS_SD3, LOW);
-  digitalWrite(SPI1_NSS_PIN, LOW);
+  digitalWrite(DDS_CS, LOW);
 }
 
 void spiWrite(byte data[], int numBytes)  //writes an array of bytes to the DDS board. Takes an array of bytes to write, the length of the array, and SPI settings.
@@ -148,7 +147,7 @@ void initializeDDS() //writes all of the static settings to the DDS
 {
   resetDDS();
 
-  digitalWrite(SPI1_NSS_PIN, LOW);
+  digitalWrite(DDS_CS, LOW);
   delay(1);
 
   //CSR Channel Select Register
@@ -168,7 +167,7 @@ void initializeDDS() //writes all of the static settings to the DDS
     spiWrite(valsToWrite, 4);
   }
   
-  digitalWrite(SPI1_NSS_PIN, HIGH);
+  digitalWrite(DDS_CS, HIGH);
 }
 
 void pulseUpdate() //pulses an update to renew the frequency
