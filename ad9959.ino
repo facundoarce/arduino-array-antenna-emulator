@@ -1,113 +1,20 @@
+/*********************************************************************************/
+/***************** SETUP AND COMMUNICATION WITH DDS ANALOG AD9959 ****************/ 
+/*********************************************************************************/
+
 /**
     Using the first SPI port (SPI_1)
     SS    <-->  PA4 <-->  BOARD_SPI1_NSS_PIN
     SCK   <-->  PA5 <-->  BOARD_SPI1_SCK_PIN
     MISO  <-->  PA6 <-->  BOARD_SPI1_MISO_PIN
     MOSI  <-->  PA7 <-->  BOARD_SPI1_MOSI_PIN
-*/
+**/
 
+uint32_t freq_test = 0;
 
-#include <SPI.h>
+/********************************* TEST FUNCTIONS ********************************/ 
 
-#define DDS_CS PA4    //SPI_1 Chip Select pin is PA4
-#define DDS_P0  PB12
-#define DDS_SD1 PA0
-#define DDS_SD3 PA1
-#define DDS_RST PA2
-#define DDS_UP  PA3
-#define DDS_PDC PB14   // Power-Down Control
-
-#define READ_DDS    0x80
-#define WRITE_DDS   0x00
-
-#define F_S         25000000  // fs = 25MHz
-#define PLL         20
-
-byte data;
-
-void setup() {
-
-  // Configure UART
-  Serial.begin(115200, SERIAL_8N1);
-
-  // Modulation pins of DDS
-  pinMode(DDS_P0, OUTPUT);
-  digitalWrite(DDS_P0, LOW); // Channel Frequency Tuning Word 0 (Register 0x04) is chosen
-
-  pinMode(DDS_SD1, OUTPUT);
-  digitalWrite(DDS_SD1, LOW); // If SD1 not used, set to 0
-
-  pinMode(DDS_SD3, OUTPUT);
-  digitalWrite(DDS_SD3, LOW); // If SD3 not used, must be set to 0
-
-  pinMode(DDS_RST, OUTPUT);
-  digitalWrite(DDS_RST, LOW); // RESET
-
-  pinMode(DDS_UP, OUTPUT);
-  digitalWrite(DDS_UP, LOW); // IO_UPDATE
-
-  pinMode(DDS_PDC, OUTPUT);
-  digitalWrite(DDS_PDC, LOW); // Power-Down Control
-
-  pinMode(DDS_CS, OUTPUT);
-  digitalWrite(DDS_CS, HIGH); // CHIP_SELECT
-
-  // Setup SPI communication
-  SPI.begin(); //Initialize the SPI_1 port.
-  SPI.setBitOrder(MSBFIRST); // Set the SPI_1 bit order
-  SPI.setDataMode(SPI_MODE0); //Set the  SPI_1 data mode 0
-  SPI.setClockDivider(SPI_CLOCK_DIV16);      // 72/2 = 36 // Slow speed (72 / 16 = 4.5 MHz SPI_1 speed)
-
-  resetDDS();       // Forces internal registers to default state
-  initializeDDS();  // Initialize register CSR, FR1, FR2 and CFR
-  pulseUpdate();    // IO_UPDATE
-  
-  uint32_t freq;
-  float phase, amplitude;
-
-  /* MODIFY CHANNEL 1 SIGNAL */
-  channelSel(1);             //select a channel (0,1,2,3) to write to.  4 selects all channels
-  
-  freq = 10e6; // 100MHz
-  writeFreq(freq);       //write a new frequency to the selected channel
-
-//  amplitude = 1.0;
-//  writeAmplitude(amplitude);
-
-  /* MODIFY CHANNEL 2 SIGNAL */
-  channelSel(2);             //select a channel (0,1,2,3) to write to.  4 selects all channels
-  
-  freq = 150e6; // 10MHz
-  writeFreq(freq);       //write a new frequency to the selected channel
-
-//  phase = 120.0;
-//  writePhase(phase);
-
-  amplitude = 1.0;
-  writeAmplitude(amplitude);
-
-  /* MODIFY CHANNEL 3 SIGNAL */
-  channelSel(3);             //select a channel (0,1,2,3) to write to.  4 selects all channels
-  
-  freq = 10e6; // 10MHz
-  writeFreq(freq);       //write a new frequency to the selected channel
-
-//  phase = 240.0;
-//  writePhase(phase);
-
-  amplitude = 1.0;
-  writeAmplitude(amplitude);
-
-  /* UPDATE CHANGES */
-  pulseUpdate();        //update output to the new frequency
-}
-
-void loop()
-{
-  delay(500);    //Delay 500 ms.
-}
-
-void sendSPI()
+void testSPI()
 {
   digitalWrite(DDS_CS, LOW); // manually take CSN low for SPI_1 transmission
 
@@ -119,6 +26,63 @@ void sendSPI()
   Serial.print(data);
   Serial.print("\r");
 }
+
+void testDDS()    // Test all the parameters (frequency, phase, amplitude) of DDS
+{
+  uint32_t freq;
+  float phase, amplitude;
+
+//  channelSel(0);
+//  freq = 100000000;
+//  writeFreq(freq);
+//  amplitude = 1.0;
+//  writeAmplitude(amplitude);
+//  
+//  channelSel(1);
+//  freq = 100000000;
+//  writeFreq(freq);
+//  amplitude = 1.0;
+//  writeAmplitude(amplitude);
+//
+//  channelSel(2);
+//  freq = 100000000;
+//  writeFreq(freq);
+//  amplitude = 1.0;
+//  writeAmplitude(amplitude);
+//  phase = 120.0;
+//  writePhase(phase);
+//
+//  channelSel(3);
+//  freq = 100000000;
+//  writeFreq(freq);
+//  amplitude = 1.0;
+//  writeAmplitude(amplitude);
+//  phase = 240.0;
+//  writePhase(phase);
+
+  channelSel(4);    // all channels
+  freq = 150000000;
+  writeFreq(freq);
+//  amplitude = 1.0;
+//  writeAmplitude(amplitude);
+//  phase = 240.0;
+//  writePhase(phase);
+
+  pulseUpdate();        //update output
+
+}
+
+void testFreq()     // Increase frequency with steps of 10MHz to analize filter characteristics of DDS
+{
+  channelSel(4);    // all channels
+  freq_test = freq_test + 10000000;
+  if ( freq_test > 250000000 ) freq_test = 0;
+  writeFreq(freq_test);
+
+  pulseUpdate();    //update output to the new frequency
+}
+
+/********************************* ACTUAL FUNCTIONS ********************************/ 
 
 void resetDDS() //master resets the DDS
 {
@@ -166,7 +130,7 @@ void initializeDDS() //writes all of the static settings to the DDS
     };
     spiWrite(valsToWrite, 4);
   }
-  
+
   digitalWrite(DDS_CS, HIGH);
 }
 
@@ -189,7 +153,7 @@ void writeFreq(uint32_t frequency) //writes a new frequency to the selected chan
 {
   uint32_t ftw = ( unsigned long )( ( float )frequency / ( F_S * PLL ) * 4294967296 );
   if ( ftw > 4294967295 ) ftw = 4294967295;   // maximum value 2^32 - 1 = 4294967295
-  
+
   //CFTW0 Channel Frequency Tuning Word 0
   byte writeCFTW0_1 = ( byte )( ( ftw >> 24 ) & 0xff );
   byte writeCFTW0_2 = ( byte )( ( ftw >> 16 ) & 0xff );
@@ -201,9 +165,11 @@ void writeFreq(uint32_t frequency) //writes a new frequency to the selected chan
 
 void writePhase(float phase) //writes a new phase offset to the selected channel
 {
+  while ( phase >= 360.0 ) phase -= 360.0;
+  
   uint16_t phow = ( uint16_t )( phase * 16384 / 360 );
   if ( phow > 16383 ) phow = 16383;   // maximum value 2^14 - 1 = 16383
-  
+
   //CPOW0 Channel Phase Offset Word 0
   byte writeCPOW0_1 = ( byte )( ( phow >> 8 ) & 0xff );
   byte writeCPOW0_2 = ( byte )( phow & 0xff );
