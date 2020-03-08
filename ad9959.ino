@@ -10,7 +10,24 @@
     MOSI  <-->  PA7 <-->  BOARD_SPI1_MOSI_PIN
 **/
 
+#include <SPI.h>
+
+#define DDS_CS  PA4    //SPI_1 Chip Select pin is PA4
+#define DDS_P0  PB12
+#define DDS_SD1 PA0
+#define DDS_SD3 PA1
+#define DDS_RST PA2
+#define DDS_UP  PA3
+#define DDS_PDC PB14   // Power-Down Control
+
+#define READ_DDS    0x80
+#define WRITE_DDS   0x00
+
+#define F_S         25000000  // System clock fs = 25MHz
+#define PLL         20
+
 uint32_t freq_test = 0;
+byte data;
 
 /********************************* TEST FUNCTIONS ********************************/ 
 
@@ -84,6 +101,42 @@ void testFreq()     // Increase frequency with steps of 10MHz to analize filter 
 
 /********************************* ACTUAL FUNCTIONS ********************************/ 
 
+void setupDDS()
+{
+  /* SETUP DIO PINS */
+  pinMode(DDS_P0, OUTPUT);
+  digitalWrite(DDS_P0, LOW); // Channel Frequency Tuning Word 0 (Register 0x04) is chosen
+
+  pinMode(DDS_SD1, OUTPUT);
+  digitalWrite(DDS_SD1, LOW); // If SD1 not used, set to 0
+
+  pinMode(DDS_SD3, OUTPUT);
+  digitalWrite(DDS_SD3, LOW); // If SD3 not used, must be set to 0
+
+  pinMode(DDS_RST, OUTPUT);
+  digitalWrite(DDS_RST, LOW); // RESET
+
+  pinMode(DDS_UP, OUTPUT);
+  digitalWrite(DDS_UP, LOW); // IO_UPDATE
+
+  pinMode(DDS_PDC, OUTPUT);
+  digitalWrite(DDS_PDC, LOW); // Power-Down Control
+
+  pinMode(DDS_CS, OUTPUT);
+  digitalWrite(DDS_CS, HIGH); // CHIP_SELECT
+
+  /* SETUP SPI COMMUNICATION */
+  SPI.begin(); //Initialize the SPI_1 port.
+  SPI.setBitOrder(MSBFIRST); // Set the SPI_1 bit order
+  SPI.setDataMode(SPI_MODE0); //Set the  SPI_1 data mode 0
+  SPI.setClockDivider(SPI_CLOCK_DIV16);      // 72/2 = 36 // Slow speed (72 / 16 = 4.5 MHz SPI_1 speed)
+
+  /* SETUP DDS */
+  resetDDS();       // Forces internal registers to default state
+  initializeDDS();  // Initialize register CSR, FR1, FR2 and CFR
+  pulseUpdate();    // IO_UPDATE
+}
+
 void resetDDS() //master resets the DDS
 {
   digitalWrite(DDS_RST, HIGH);
@@ -140,9 +193,9 @@ void pulseUpdate() //pulses an update to renew the frequency
   digitalWrite(DDS_UP, LOW);
 }
 
-void channelSel(int chNO) //sets channel to write to
+void channelSel(int chNO) //select a channel (0,1,2,3) to write to.  4 selects all channels
 {
-  byte chans[] = {B0010000, B00100000, B01000000, B10000000, B11110000};
+  byte chans[] = {B00010000, B00100000, B01000000, B10000000, B11110000};
   {
     byte valsToWrite[] = {B00000000, chans[chNO] | B00000010};
     spiWrite(valsToWrite, 2);
